@@ -3,7 +3,7 @@ cachetools==5.5.2
 certifi==2025.1.31
 charset-normalizer==3.4.1
 cloudinary==1.41.0
-Django==5.1.6
+Django==5.1.14
 django-cloudinary-storage==0.3.0
 django-cors-headers==4.7.0
 django-filter==25.1

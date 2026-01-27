@@ -1,3 +1,4 @@
+from urllib import request
 from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
 from django.utils import timezone
@@ -217,10 +218,11 @@ class TeamSerializer(serializers.ModelSerializer):
     hackathon = serializers.SerializerMethodField()
     projects = serializers.SerializerMethodField()
     submissions = serializers.SerializerMethodField()
+    is_member_of = serializers.SerializerMethodField()   
 
     class Meta:
         model = Team
-        fields = ['id', 'name', 'organizer', 'creator', 'members', 'hackathon', 'projects', 'submissions', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'organizer', 'creator', 'members', 'hackathon', 'projects', 'submissions', 'is_member_of', 'created_at', 'updated_at']
 
     def get_organizer(self, obj):
         if obj.organizer:
@@ -274,7 +276,13 @@ class TeamSerializer(serializers.ModelSerializer):
     
     def get_submissions(self, obj):
         return [{'id': submission.id, 'project_title': submission.project.title if submission.project else None} for submission in obj.get_submissions()]
+    def get_is_member_of(self, obj):
+      request = self.context.get('request')
 
+      if not request or not request.user.is_authenticated:
+         return False
+
+      return obj.members.filter(id=request.user.id).exists()
 
 class UpdateTeamSerializer(serializers.ModelSerializer):
     class Meta:

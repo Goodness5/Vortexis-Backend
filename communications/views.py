@@ -222,7 +222,13 @@ class MessageViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Upda
         return self._paginator
 
     def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return Message.objects.none()
+
         user = self.request.user
+        if not user.is_authenticated:
+            return Message.objects.none()
+
         conversation_id = self.kwargs.get('conversation_pk')
 
         # Ensure user is participant
@@ -248,6 +254,8 @@ class MessageViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Upda
         # Ensure user is participant in the conversation
         conversation_id = self.kwargs.get('conversation_pk')
         user = self.request.user
+        if not user.is_authenticated:
+            raise PermissionDenied("Authentication required.")
         if not ConversationParticipant.objects.filter(conversation_id=conversation_id, user=user).exists():
             raise PermissionDenied("You are not a participant in this conversation.")
         return obj
@@ -255,6 +263,9 @@ class MessageViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, mixins.Upda
     def perform_create(self, serializer):
         conversation_id = self.kwargs.get('conversation_pk')
         user = self.request.user
+
+        if not user.is_authenticated:
+            raise PermissionDenied("Authentication required.")
 
         # Check if conversation exists
         try:

@@ -11,6 +11,8 @@ from .serializers import CreateTeamSerializer, TeamSerializer, UpdateTeamSeriali
 from .models import Team
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+from .models import Team, TeamJoinRequest
+from django.shortcuts import get_object_or_404
 
 # Create your views here.
 
@@ -220,3 +222,83 @@ class TeamViewSet(ModelViewSet):
         except Team.DoesNotExist:
             return Response({'error': 'Team not found'}, status=status.HTTP_404_NOT_FOUND)
 
+    @action(detail=False, methods=['post'])
+    def request_to_join(self, request):
+        if not request.user.is_authenticated:
+            return Response({'error': 'Authentication required.'}, status=401)
+
+        team_id = request.data.get('team_id')
+        if not team_id:
+            return Response({'error': 'team_id is required'}, status=400)
+
+        team = get_object_or_404(Team, id=team_id)
+        user = request.user
+
+        if team.members.filter(id=user.id).exists():
+            return Response({'error': 'You are already a member of this team'}, status=400)
+
+        already_in_team = Team.objects.filter(hackathon=team.hackathon, members=user).exists()
+        if already_in_team:
+            return Response({'error': 'You are already in a team for this hackathon'}, status=400)
+
+        join_request, created = TeamJoinRequest.objects.get_or_create(team=team, user=user)
+
+        if not created:
+            return Response({'error': 'Join request already sent'}, status=400)
+
+        return Response({'message': 'Join request sent'}, status=201)
+
+
+    @action(detail=False, methods=['post'])
+    def approve_join_request(self, request):
+        if not request.user.is_authenticated:
+            return Response({'error': 'Authentication required.'}, status=401)
+
+        team_id = request.data.get('team_id')
+        user_id = request.data.get('user_id')  # optional: the user whose request is being approved
+
+        if not team_id:
+            return Response({'error': 'team_id is required'}, status=400)
+
+        team = get_object_or_404(Team, id=team_id)
+
+        if team.creator != request.user:
+            return Response({'error': 'Only the team creator can approve requests.'}, status=403)
+
+        # Get join request
+        if user_id:
+            join_request = TeamJoinRequest.objects.filter(team=team, user_id=user_id, status='pending').first()
+        else:
+            join_request = TeamJoinRequest.objects.filter(team=team, status='pending').first()
+
+        if not join_request:
+            return Response({'error': 'No pending join request found for this team.'}, status=404)
+
+        join_request.status = 'approved'
+        join_request.save()
+        team.members.add(join_request.user)
+
+        return Response({'message': f'{join_request.user.username} added to team.'}, status=200)
+        
+    @action(detail=False, methods=['post'])
+    def reject_join_request(self, request):
+        if not request.user.is_authenticated:
+            return Response({'error': 'Authentication required.'}, status=401)
+
+        team_id = request.data.get('team_id')
+        if not team_id:
+            return Response({'error': 'team_id is required'}, status=400)
+
+        team = get_object_or_404(Team, id=team_id)
+
+        if team.creator != request.user:
+            return Response({'error': 'Only the team creator can reject requests.'}, status=403)
+
+        join_request = TeamJoinRequest.objects.filter(team=team, status='pending').first()
+        if not join_request:
+            return Response({'error': 'No pending join request found for this team.'}, status=404)
+
+        join_request.status = 'rejected'
+        join_request.save()
+
+        return Response({'message': f'{join_request.user.username} join request rejected.'}, status=200) 

@@ -96,6 +96,29 @@ class DeleteOrganizationView(GenericAPIView):
             return Response({'error': 'Not authorized.'}, status=status.HTTP_403_FORBIDDEN)
         organization.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+    
+class DeleteMyOrganizationView(GenericAPIView):
+    permission_classes = [IsAuthenticated, IsOrganizationOrganizer]
+
+    @swagger_auto_schema(
+        responses={204: 'No Content', 403: 'Forbidden', 404: 'Not Found'},
+        operation_description="Delete an organization owned by the authenticated user.",
+        tags=['organization']
+    )
+    def delete(self, request, organization_id):
+        try:
+            organization = Organization.objects.get(
+                id=organization_id,
+                organizer=request.user
+            )
+        except Organization.DoesNotExist:
+            return Response(
+                {'error': 'Organization not found or not owned by you.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        organization.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 class GetOrganizationView(GenericAPIView):
     permission_classes = [IsAuthenticated]

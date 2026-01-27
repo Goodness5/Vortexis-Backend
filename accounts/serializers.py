@@ -141,7 +141,7 @@ class UserSerializer:
                 user = User.objects.get(email=data['email'])
             except User.DoesNotExist:
                 raise serializers.ValidationError({"email": "User with this email does not exist."})
-            if not verify_otp(data['code']):
+            if not verify_otp(user, data['code']):
                 raise serializers.ValidationError({"code": "Invalid or expired OTP."})
             return user
 

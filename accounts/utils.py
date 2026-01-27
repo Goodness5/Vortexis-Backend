@@ -1,24 +1,65 @@
-import pyotp
-import time
+import random
+import string
 from django.conf import settings
 from django.core.mail import EmailMessage
+from django.utils import timezone
+from datetime import timedelta
 from notifications.services import NotificationService
 
-from .models import User
+from .models import User, OTP
 
-secret_key = pyotp.random_base32()
-totp = pyotp.TOTP(secret_key, interval=120)
+def generate_otp(user):
+    """
+    Generate a 6-digit OTP and store it in the database.
+    Invalidates any previous unused OTPs for the user.
+    """
+    # Invalidate any previous unused OTPs for this user
+    OTP.objects.filter(user=user, is_used=False).update(is_used=True)
+    
+    # Generate a 6-digit random OTP
+    code = ''.join(random.choices(string.digits, k=6))
+    
+    # Create and save the OTP
+    otp_obj = OTP.objects.create(
+        user=user,
+        code=code,
+        expires_at=timezone.now() + timedelta(minutes=10)  # OTP expires in 10 minutes
+    )
+    
+    return code
 
-def generate_otp():
-    return totp.now()
-
-def verify_otp(token):
-    return totp.verify(token)
+def verify_otp(user, code):
+    """
+    Verify an OTP code for a user.
+    Returns True if the OTP is valid, False otherwise.
+    """
+    if not user or not code:
+        return False
+    
+    # Get the most recent unused OTP for this user
+    otp_obj = OTP.objects.filter(
+        user=user,
+        code=code,
+        is_used=False
+    ).order_by('-created_at').first()
+    
+    if not otp_obj:
+        return False
+    
+    # Check if OTP is expired
+    if otp_obj.is_expired():
+        return False
+    
+    # Mark OTP as used
+    otp_obj.is_used = True
+    otp_obj.save()
+    
+    return True
 
 
 def send_otp_mail(email):
-    otp = generate_otp()
     user = User.objects.get(email=email)
+    otp = generate_otp(user)
 
     subject = 'Vortexis Verification OTP'
     message = f'Hi {user.first_name},\n\nThank you for signing up on Vortexis. Please use the following OTP to verify your account.\n\nOTP: {otp}\n\nIf you did not sign up on Vortexis, please ignore this email.\n\nRegards,\nVortexis Team'

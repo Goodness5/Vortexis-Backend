@@ -17,7 +17,8 @@ class GoogleSocialAuthView(ViewSet):
     def create(self, request):
         serializer = GoogleSocialAuthSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        return Response(serializer.data.get('access_token'), status=status.HTTP_200_OK)
+        user_data = serializer.validated_data.get('user_data')
+        return Response(user_data, status=status.HTTP_200_OK)
     
 class GithubSocialAuthView(ViewSet):
 
@@ -30,4 +31,5 @@ class GithubSocialAuthView(ViewSet):
     def create(self, request):
         serializer = GithubSocialAuthSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        return Response(serializer._validated_data['code'], status=status.HTTP_200_OK)
+        user_data = serializer.validated_data.get('user_data')
+        return Response(user_data, status=status.HTTP_200_OK)

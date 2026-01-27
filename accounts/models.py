@@ -89,3 +89,28 @@ class PasswordResetToken(models.Model):
     def __str__(self):
         return f"Password reset token for {self.user.username}"
 
+
+class OTP(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='otps')
+    code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
+
+    def save(self, *args, **kwargs):
+        if not self.expires_at:
+            self.expires_at = timezone.now() + timedelta(minutes=10)  # OTP expires in 10 minutes
+        super().save(*args, **kwargs)
+
+    def is_expired(self):
+        return timezone.now() > self.expires_at
+
+    def is_valid(self):
+        return not self.is_used and not self.is_expired()
+
+    def __str__(self):
+        return f"OTP for {self.user.username}"
+
+    class Meta:
+        ordering = ['-created_at']  # Most recent first
+
